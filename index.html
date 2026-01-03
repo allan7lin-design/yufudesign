@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>廣告招牌 ERP - V7.70 (手動確認預付版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4338ca; --bg: #f8fafc;
+            --text-dark: #1e293b; --text-light: #64748b;
+            --green: #10b981; --red: #ef4444; --blue: #3b82f6; --orange: #f59e0b;
+        }
+        * { box-sizing: border-box; font-family: "Segoe UI", system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 15px; background: var(--bg); color: var(--text-dark); font-size: 14px; padding-bottom: 80px; }
+        .container { max-width: 1750px; margin: 0 auto; }
+
+        /* Preview Tooltip */
+        #party_preview_tooltip {
+            position: fixed; z-index: 10001; background: white; border: 1px solid #cbd5e1;
+            padding: 12px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            pointer-events: none; display: none; min-width: 250px; max-width: 350px; font-size: 13px; line-height: 1.6;
+        }
+        .preview-title { font-weight: 800; color: var(--primary); border-bottom: 2px solid #f1f5f9; margin-bottom: 8px; padding-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+        .hover-info { color: var(--primary); text-decoration: underline dotted; cursor: help; }
+        .preview-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding: 2px 0; }
+        
+        /* Header */
+        header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .brand h2 { margin: 0; font-size: 20px; font-weight: 800; color: #334155; }
+        .brand span { background: var(--primary); color: white; padding: 2px 6px; border-radius: 6px; font-size: 11px; margin-left: 5px; vertical-align: middle; }
+        
+        .sync-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: #f1f5f9; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: 0.3s; margin-left: 10px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+        .dot.ok { background: #10b981; box-shadow: 0 0 5px #10b981; }
+        .dot.sync { background: #f59e0b; animation: pulse 1s infinite; }
+        .dot.err { background: #ef4444; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Buttons */
+        .btn { padding: 8px 14px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; margin-left: 5px; }
+        .btn:hover { transform: translateY(-1px); filter: brightness(95%); }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #475569; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-purple { background: #8b5cf6; color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        
+        /* Date Quick Buttons */
+        .date-btns { display: inline-flex; gap: 2px; margin-left: 5px; }
+        .date-btn { padding: 4px 8px; font-size: 11px; border: 1px solid #cbd5e1; background: white; cursor: pointer; border-radius: 4px; color: var(--primary); }
+        .date-btn:hover { background: #e0e7ff; }
+
+        /* Tabs */
+        .tab-menu { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+        .tab-btn { padding: 10px 16px; border: none; background: white; color: var(--text-light); font-weight: 600; border-radius: 8px; cursor: pointer; transition: 0.2s; white-space: nowrap; flex-shrink: 0; }
+        .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Dashboard & Cards */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi-card { padding: 20px; border-radius: 16px; color: white; position: relative; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .kpi-card h3 { margin: 0 0 5px 0; font-size: 13px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-card .val { font-size: 28px; font-weight: 800; margin: 0; }
+        .bg-g-green { background: linear-gradient(135deg, #10b981, #059669); }
+        .bg-g-red { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+        .bg-g-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .bg-g-purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+        .bg-g-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); border: 1px solid #e2e8f0; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; align-items: end; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 5px; }
+        input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #f8fafc; transition: 0.2s; width: 100%; }
+        
+        .table-responsive { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; background: white; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); border-bottom: 2px solid #e2e8f0; white-space: nowrap; cursor: pointer; user-select: none; }
+        th:hover { background-color: #e2e8f0; }
+        td { padding: 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+        
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block; white-space: nowrap; }
+        .b-green { background: #dcfce7; color: #14532d; }
+        .b-red { background: #fee2e2; color: #7f1d1d; }
+        .b-blue { background: #dbeafe; color: #1e3a8a; }
+        .b-gray { background: #f1f5f9; color: #475569; }
+
+        .filter-bar { background: #e0e7ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; gap: 10px; align-items: flex-end; border: 1px solid #c7d2fe; flex-wrap: wrap; }
+        .filter-bar h5 { width: 100%; margin: 0 0 5px 0; font-size: 12px; color: var(--primary); }
+        
+        .bank-history { max-height: 120px; overflow-y: auto; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 10px; font-size: 12px; color: #64748b; }
+        .bank-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #cbd5e1; }
+        .sub-item { font-size: 12px; padding: 2px 0; border-bottom: 1px dashed #eee; color: #555; }
+        .hidden { display: none; }
+
+        .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .chart-container { position: relative; height: 300px; width: 100%; margin-bottom: 10px; }
+        .rpt-table th { background: #e0e7ff; color: #1e3a8a; }
+        .rpt-row:hover { background: #f0fdf4; }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 30px; width: 95%; max-width: 900px; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); position: relative; max-height: 90vh; overflow-y: auto; }
+        .close { position: absolute; right: 20px; top: 20px; font-size: 24px; cursor: pointer; color: #94a3b8; }
+        
+        /* Status Button */
+        .status-btn { 
+            border: 1px solid #ccc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; min-width: 70px;
+        }
+        .status-btn:hover { opacity: 0.8; transform: scale(1.05); }
+        .st-paid { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .st-unpaid { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .st-deposit { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+
+        .stmt-bank-sel { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; max-width: 100px; }
+        
+        /* Error Box */
+        #error_rescue { display:none; position:fixed; bottom:0; left:0; width:100%; background:#7f1d1d; color:white; padding:20px; text-align:center; z-index:10000; }
+        
+        /* Prepaid Specific */
+        .prepaid-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+        .prepaid-bal { font-weight: bold; font-size: 16px; }
+        .is-neg { color: red; }
+        .prepaid-badge { background:#ffedd5; color:#c2410c; border:1px solid #fdba74; font-size:10px; padding:2px 5px; border-radius:4px; margin-left:5px; vertical-align:middle; display:inline-block; }
+    </style>
+</head>
+<body>
+
+<div id="party_preview_tooltip"></div>
+
+<div id="error_rescue">
+    <h3>⚠️ 系統偵測到錯誤</h3>
+    <p>請嘗試重新整理。若仍無法使用，請點擊下方按鈕重置系統 (資料將清空)。</p>
+    <button class="btn btn-outline" style="background:white; color:red;" onclick="hardReset()">🚨 強制重置</button>
+</div>
+
+<div id="configModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeConfig()">&times;</span>
+        <h2 style="margin-top:0">☁️ 雲端設定</h2>
+        <input type="text" id="api_url_input" placeholder="https://script.google.com/..." style="width:100%; margin-bottom:10px;">
+        <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <button class="btn btn-primary" onclick="testConnection()">連線測試</button>
+            <button class="btn btn-outline" onclick="closeConfig()">關閉</button>
+        </div>
+        <hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">
+        <button class="btn btn-danger" onclick="hardReset()">🔄 重置系統</button>
+    </div>
+</div>
+
+<div id="bankModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <span class="close" onclick="closeBankModal()">&times;</span>
+        <h2 style="margin-top:0">💰 資金操作 (存/提/轉)</h2>
+        <form onsubmit="event.preventDefault(); saveBankTrans();">
+            <div class="form-group">
+                <label>日期</label>
+                <input type="date" id="bt_date" required>
+            </div>
+            <div class="form-group">
+                <label>操作類型</label>
+                <select id="bt_type" onchange="toggleBankTransFields()">
+                    <option value="deposit">➕ 存款 (收入)</option>
+                    <option value="withdraw">➖ 提款 (支出)</option>
+                    <option value="transfer">🔄 內部轉帳 (互轉)</option>
+                </select>
+            </div>
+            <div class="form-group"><label id="lbl_source">存入帳戶</label><select id="bt_source" class="bank-sel"></select></div>
+            <div class="form-group hidden" id="div_target"><label>轉入帳戶</label><select id="bt_target" class="bank-sel"></select></div>
+            <div class="form-group"><label>金額</label><input type="number" id="bt_amt" required placeholder="輸入金額"></div>
+            <div class="form-group"><label>備註</label><input type="text" id="bt_note" placeholder="備註"></div>
+            <div style="margin-top:20px;"><button class="btn btn-primary" style="width:100%">確認執行</button></div>
+        </form>
+    </div>
+</div>
+
+<div id="prepaidModal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <span class="close" onclick="document.getElementById('prepaidModal').style.display='none'">&times;</span>
+        <h2 style="margin-top:0">🏭 廠商預付金管理</h2>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #e2e8f0; max-height:400px; overflow-y:auto;">
+                <h4 style="margin-top:0; color:var(--primary);">現有預付餘額列表</h4>
+                <div id="prepaid_list_div"></div>
+            </div>
+            <div>
+                <h4 style="margin-top:0; color:#059669;">➕ 新增預付 (儲值)</h4>
+                <form onsubmit="event.preventDefault(); doPrepaidTopUp();">
+                    <div class="form-group">
+                        <label>選擇/輸入廠商</label>
+                        <input type="text" id="pp_vendor" list="vlist_prepaid" required placeholder="輸入廠商名稱...">
+                        <datalist id="vlist_prepaid"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>資金來源 (扣款帳戶)</label>
+                        <select id="pp_source_bank" class="bank-sel"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>儲值金額</label>
+                        <input type="number" id="pp_amt" required placeholder="例如: 10000">
+                    </div>
+                    <div class="form-group">
+                        <label>備註</label>
+                        <input type="text" id="pp_note" placeholder="例如: 月底先結、材料預付款">
+                    </div>
+                    <button class="btn btn-success" style="width:100; margin-top:15px;">💰 確認轉帳儲值</button>
+                </form>
+                <div style="margin-top:20px; padding:10px; background:#fff7ed; font-size:12px; border:1px solid #ffedd5; color:#c2410c; border-radius:6px;">
+                    💡 <b>說明：</b><br>
+                    1. 儲值後，資金會轉入該廠商的「預付帳戶」。<br>
+                    2. 若廠商已設定為「預付廠商」，訂單發包時將<b>自動</b>從此餘額扣除。
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="invModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <span class="close" onclick="document.getElementById('invModal').style.display='none'">&times;</span>
+        <h2 style="margin-top:0">🧾 發票號碼管理</h2>
+        <div style="background:#f0f9ff; padding:15px; border-radius:8px; margin-bottom:15px;">
+            <label style="color:#0369a1; font-weight:bold;">目前剩餘張數：</label>
+            <span id="inv_pool_count" style="font-size:24px; font-weight:bold; color:#0284c7;">0</span> 張
+            <div id="inv_next_val" style="font-size:12px; color:#555; margin-top:5px;">下一張: 無</div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group"><label>字軌</label><input type="text" id="inv_prefix" placeholder="AB" maxlength="2" style="text-transform:uppercase;"></div>
+            <div class="form-group"><label>起始號碼</label><input type="number" id="inv_start" placeholder="00000100"></div>
+            <div class="form-group"><label>結束號碼</label><input type="number" id="inv_end" placeholder="00000200"></div>
+        </div>
+        <button class="btn btn-purple" style="width:100%; margin-top:15px;" onclick="addInvoiceRange()">➕ 匯入發票號碼</button>
+        <button class="btn btn-danger" style="width:100%; margin-top:10px;" onclick="clearInvoicePool()">🗑️ 清空所有庫存</button>
+    </div>
+</div>
+
+<div id="statementModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2 id="modal_title" style="margin-top:0">對帳單</h2>
+        <div id="modal_info" style="color:var(--text-light); margin-bottom:15px;"></div>
+        <div style="text-align:right; margin-bottom:15px; display:flex; gap:5px; justify-content:flex-end; align-items:center;">
+            <select id="modal_filter" style="padding:6px; border-radius:4px; border:1px solid #ddd;" onchange="refreshStatement()"></select>
+            <span style="color:#ddd">|</span>
+            <input type="date" id="modal_start" style="padding:6px; border-radius:4px; border:1px solid #ddd; width:auto;"> ~ 
+            <input type="date" id="modal_end" style="padding:6px; border-radius:4px; border:1px solid #ddd; width:auto;">
+            <button class="btn btn-primary btn-sm" onclick="refreshStatement()">查詢</button>
+        </div>
+        <div class="table-responsive"><table id="modal_table"><thead></thead><tbody></tbody></table></div>
+        <div id="modal_summary" style="margin-top:15px; padding:15px; background:#f1f5f9; border-radius:8px; font-weight:700; text-align:right; color:var(--primary); font-size:16px;"></div>
+    </div>
+</div>
+
+<div class="container">
+    <header>
+        <div style="display:flex; align-items:center;">
+            <div class="brand">
+                <h2>譽富國際會計系統 <span>V7.70</span></h2>
+                <div id="clock" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
+            </div>
+            <div class="sync-status" onclick="openConfig()" title="點擊設定雲端">
+                <div id="status_dot" class="dot"></div>
+                <span id="status_text">待機</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+            <button class="btn btn-purple" onclick="openInvModal()">🧾 發票管理</button>
+            <button class="btn btn-outline" onclick="syncData(true)">🔄 強制同步</button>
+            <button class="btn btn-outline" onclick="exportData()">📥 備份</button>
+            <input type="file" id="importFile" style="display:none" onchange="importData(this)">
+            <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 還原</button>
+        </div>
+    </header>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">📊 儀表板</button>
+        <button class="tab-btn" onclick="switchTab('reports')">📈 經營報表</button>
+        <button class="tab-btn" onclick="switchTab('orders')">📝 訂單</button>
+        <button class="tab-btn" onclick="switchTab('recurring')">📅 固定支出</button>
+        <button class="tab-btn" onclick="switchTab('expenses')">💸 浮動支出</button>
+        <button class="tab-btn" onclick="switchTab('parties')">👥 名單管理</button>
+        <button class="tab-btn" onclick="switchTab('banks')">🏦 銀行/資金</button>
+    </div>
+
+    <div id="dashboard" class="tab-content active">
+        <div class="dashboard-grid">
+            <div class="kpi-card bg-g-green"><h3>本月淨現金流</h3><div class="val" id="kpi_cash">$0</div></div>
+            <div class="kpi-card bg-g-purple"><h3>預估應繳稅額</h3><div class="val" id="kpi_vat">$0</div></div>
+            <div class="kpi-card bg-g-red"><h3>應收帳款 (AR)</h3><div class="val" id="kpi_ar">$0</div></div>
+            <div class="kpi-card bg-g-orange"><h3>應付帳款 (AP)</h3><div class="val" id="kpi_ap">$0</div></div>
+        </div>
+        <div id="inv_alert_box" style="display:none; background:#fee2e2; color:#b91c1c; padding:15px; border-radius:8px; border:1px solid #fca5a5; margin-top:20px; font-weight:bold; text-align:center;">
+            ⚠️ 發票號碼庫存不足，請至上方「發票管理」補充！
+        </div>
+    </div>
+    
+    <div id="reports" class="tab-content">
+        <div class="report-grid">
+            <div class="card"><h4>📊 收款狀態</h4><div class="chart-container"><canvas id="c_pie"></canvas></div></div>
+            <div class="card"><h4>📈 收支對比</h4><div class="chart-container"><canvas id="c_bar"></canvas></div></div>
+            <div class="card"><h4>💹 資金流趨勢</h4><div class="chart-container"><canvas id="c_line"></canvas></div></div>
+            <div class="card"><h4>🏆 客戶貢獻排行</h4><div class="chart-container"><canvas id="c_cust"></canvas></div></div>
+        </div>
+        <div class="card">
+            <h4>📅 月度損益詳情表</h4>
+            <div class="table-responsive" style="margin-bottom:15px;">
+                <table class="rpt-table" id="rpt_month_table"><thead><tr><th>月份</th><th>總營收</th><th>總支出</th><th>淨利</th><th>毛利率</th></tr></thead><tbody></tbody></table>
+            </div>
+            <button class="btn btn-success" onclick="exportExcel()">📥 下載 Excel</button>
+        </div>
+    </div>
+
+    <div id="orders" class="tab-content">
+        <div class="card">
+            <h4>➕ 新增訂單</h4>
+            <form id="orderForm" onsubmit="event.preventDefault(); saveOrder();">
+                <input type="hidden" id="o_edit_id">
+                <div class="form-grid">
+                    <div class="form-group"><label>日期</label><input type="date" id="o_date" required></div>
+                    <div class="form-group"><label>專案</label><input type="text" id="o_proj" required></div>
+                    <div class="form-group"><label>客戶</label><input type="text" id="o_cust" list="clist" placeholder="選取或輸入新客戶" required><datalist id="clist"></datalist></div>
+                    <div class="form-group"><label>發票類型</label><select id="o_invoice"><option value="無">無</option><option value="二聯">二聯</option><option value="三聯">三聯</option></select></div>
+                    <div class="form-group"><label>發票號碼</label><input type="text" id="o_inv_num" placeholder="自動帶入 或 手動輸入"></div>
+                    <div class="form-group"><label>未稅</label><input type="number" id="o_base" oninput="calcTax('o','base')"></div>
+                    <div class="form-group"><label>稅金</label><input type="number" id="o_tax"></div>
+                    <div class="form-group"><label>總價 (含稅)</label><input type="number" id="o_price" oninput="calcTax('o','total')" required></div>
+                    <div class="form-group"><label>訂金</label><input type="number" id="o_deposit" value="0"></div>
+                    <div class="form-group"><label>請款</label><select id="o_inv"><option>未請款</option><option>已請款</option></select></div>
+                    <div class="form-group"><label>收款</label><select id="o_pay"><option value="未收款">未收款</option><option value="已收訂金">已收訂金</option><option value="已收全款">已收全款</option></select></div>
+                    <div class="form-group"><label>入帳銀行</label><select id="o_bank" class="bank-sel"></select></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>備註事項</label><input type="text" id="o_note" placeholder="訂單特殊備註..."></div>
+                </div>
+                <div style="margin-top:15px; background:#f0fdf4; padding:15px; border-radius:8px; border:1px solid #bbf7d0;">
+                    <label style="color:#166534; font-weight:bold;">發包廠商 (成本)</label>
+                    <div style="margin-bottom:8px; font-size:12px; color:#15803d;">💡 小撇步：若選擇已設定為「預付廠商」的對象，付款銀行將自動切換為「預付扣款」。</div>
+                    <div id="sub_area" style="margin-top:10px;"></div>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addSubRow()">+ 增加廠商</button>
+                </div>
+                <div style="margin-top:20px; display:flex; gap:10px;"><button type="submit" class="btn btn-primary" style="flex:1">儲存訂單</button></div>
+            </form>
+        </div>
+        
+        <div class="filter-bar">
+            <h5>🔍 訂單篩選</h5>
+            <div class="form-group"><select id="fo_inv" onchange="renderOrders()"><option value="">全部</option><option value="已請款">已請款</option><option value="未請款">未請款</option></select></div>
+            <div class="form-group"><select id="fo_pay" onchange="renderOrders()"><option value="">全部</option><option value="未收款">未收款(含訂)</option><option value="已收款">已收款</option></select></div>
+            <div class="form-group"><input type="date" id="fo_start" onchange="renderOrders()"></div>
+            <div class="form-group"><input type="date" id="fo_end" onchange="renderOrders()"></div>
+            <div class="form-group" style="padding-bottom:10px;">
+                <div class="date-btns"><button class="date-btn" onclick="setDateRange('month', 'fo')">本月</button><button class="date-btn" onclick="setDateRange('quarter', 'fo')">本季</button><button class="date-btn" onclick="setDateRange('year', 'fo')">本年</button></div>
+            </div>
+            <div class="form-group"><input type="text" id="s_key_o" placeholder="搜尋..." oninput="renderOrders()"></div>
+        </div>
+        <div id="order_search_summary" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:15px; font-weight:bold; color:#0369a1; border:1px solid #bae6fd;">📊 搜尋小計: 請輸入條件</div>
+        <div class="table-responsive">
+            <table id="o_table">
+                <thead><tr><th onclick="sortOrders('date')">日期 <span id="sort_date">▼</span></th><th onclick="sortOrders('proj')">專案/客戶 <span id="sort_proj"></span></th><th onclick="sortOrders('invNum')">發票 <span id="sort_invNum"></span></th><th onclick="sortOrders('price')">金額/利潤 <span id="sort_price"></span></th><th>狀態</th><th>發包明細</th><th>操作</th></tr></thead>
+                <tbody id="o_list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="recurring" class="tab-content">
+        <div class="card">
+            <h4>📅 固定支出</h4>
+            <form id="recurForm" onsubmit="event.preventDefault(); saveRecurring();">
+                <input type="hidden" id="r_edit_id">
+                <div class="form-grid">
+                    <input type="text" id="r_title" placeholder="項目" required>
+                    <input type="number" id="r_amt" placeholder="金額" required>
+                    <select id="r_bank" class="bank-sel"></select>
+                    <select id="r_period"><option value="monthly">每月</option><option value="yearly">每年</option></select>
+                    <input type="number" id="r_cycle_val" placeholder="扣款日" required>
+                    <input type="date" id="r_start" required><input type="date" id="r_end" required>
+                    <input type="text" id="r_note" placeholder="備註">
+                    <button class="btn btn-primary">儲存</button>
+                </div>
+            </form>
+        </div>
+        <div class="filter-bar">
+            <h5>🔍 合約篩選</h5>
+            <div class="form-group"><input type="date" id="fr_start" onchange="renderRecurring()"></div>
+            <div class="form-group"><input type="date" id="fr_end" onchange="renderRecurring()"></div>
+            <div class="form-group"><input type="text" id="s_key_r" placeholder="項目..." oninput="renderRecurring()"></div>
+        </div>
+        <div class="table-responsive"><table><thead><tr><th>項目</th><th>銀行/備註</th><th>金額</th><th>未來 5 期 (點擊支付)</th><th>操作</th></tr></thead><tbody id="r_list"></tbody></table></div>
+    </div>
+
+    <div id="expenses" class="tab-content">
+        <div class="card">
+            <h4>💸 浮動支出</h4>
+            <form id="expForm" onsubmit="event.preventDefault(); saveExpense();">
+                <input type="hidden" id="e_edit_id">
+                <div class="form-grid">
+                    <input type="date" id="e_date" required>
+                    <input type="text" id="e_note" placeholder="目的" required>
+                    <input type="text" id="e_target" placeholder="對象" list="vlist"><datalist id="vlist"></datalist>
+                    <input type="number" id="e_amt" placeholder="總額" required oninput="calcTax('e','total')">
+                    <input type="number" id="e_base" placeholder="未稅" oninput="calcTax('e','base')">
+                    <input type="number" id="e_tax" placeholder="稅金">
+                    <select id="e_bank" class="bank-sel"></select>
+                    <select id="e_status"><option value="已支付">已支付</option><option value="未支付">未支付</option></select>
+                    <input type="text" id="e_remark" placeholder="備註">
+                    <button class="btn btn-primary">儲存</button>
+                </div>
+            </form>
+        </div>
+        <div class="filter-bar">
+            <h5>🔍 支出篩選</h5>
+            <div class="form-group"><select id="fe_status" onchange="renderExpenses()"><option value="">全部</option><option value="已支付">已支付</option><option value="未支付">未支付</option></select></div>
+            <div class="form-group"><input type="date" id="fe_start" onchange="renderExpenses()"></div>
+            <div class="form-group"><input type="date" id="fe_end" onchange="renderExpenses()"></div>
+            <div class="form-group"><input type="text" id="s_key_e" placeholder="目的/對象..." oninput="renderExpenses()"></div>
+        </div>
+        <div class="table-responsive"><table><thead><tr><th>日期</th><th>目的</th><th>對象 (懸停預覽)</th><th>金額</th><th>銀行</th><th>狀態</th><th>操作</th></tr></thead><tbody id="e_list"></tbody></table></div>
+    </div>
+
+    <div id="parties" class="tab-content">
+        <div class="card">
+            <h4>名單管理</h4>
+            <form id="partyForm" onsubmit="event.preventDefault(); saveParty();">
+                <input type="hidden" id="p_edit_id">
+                <div class="form-grid">
+                    <div class="form-group"><label>類型</label><select id="p_type"><option value="c">客戶</option><option value="v">廠商</option></select></div>
+                    <div class="form-group"><label>名稱</label><input type="text" id="p_name" placeholder="公司/個人名稱" required></div>
+                    <div class="form-group"><label>統編</label><input type="text" id="p_tax" placeholder="統編"></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>地址</label><input type="text" id="p_address" placeholder="地址"></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>備註</label><input type="text" id="p_note" placeholder="備註 (ex: 結帳日/習慣)"></div>
+                </div>
+                <div style="margin-top:15px; padding:10px; background:#fff7ed; border:1px solid #ffedd5; border-radius:6px; display:flex; align-items:center;">
+                    <input type="checkbox" id="p_is_prepaid" style="width:20px; height:20px; margin-right:10px;">
+                    <div>
+                        <label for="p_is_prepaid" style="font-size:14px; color:#c2410c; margin-bottom:2px; display:block;">設定為預付廠商 (自動扣款)</label>
+                        <span style="font-size:11px; color:#9a3412;">勾選後，發包給此廠商時，付款方式將預設為「預付扣款」，並自動從餘額扣除。</span>
+                    </div>
+                </div>
+
+                <div style="margin-top:15px; background:#eff6ff; padding:15px; border-radius:8px; border:1px solid #bfdbfe;">
+                    <label style="color:#1e3a8a; font-weight:bold;">📞 聯絡人 / 電話 / Line (多選)</label>
+                    <div id="contact_area" style="margin-top:10px;"></div>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addContactRow()">+ 新增聯絡人</button>
+                </div>
+                <div style="margin-top:20px;"><button class="btn btn-primary" style="width:100%">儲存名單</button></div>
+            </form>
+        </div>
+        <div class="filter-bar">
+            <h5>🔍 名單搜尋 (含地址/備註/聯絡人)</h5>
+            <div class="form-group" style="flex:1;">
+                <input type="text" id="s_key_p" placeholder="搜尋關鍵字..." oninput="renderParties()">
+            </div>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <div class="table-responsive"><h5 style="padding:10px;">👤 客戶列表</h5><table id="c_table"><thead><tr><th>名稱 (滑鼠懸停查看詳情)</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+            <div class="table-responsive"><h5 style="padding:10px;">🏭 廠商列表</h5><table id="v_table"><thead><tr><th>名稱 (滑鼠懸停查看詳情)</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="banks" class="tab-content">
+        <div class="card">
+            <h4>🏦 銀行 / 💳 信用卡 / 💵 現金</h4>
+            <div style="float:right; display:flex; gap:5px; margin-bottom:10px;">
+                <button class="btn btn-blue" onclick="openPrepaidModal()">🏭 廠商預付管理</button>
+                <button class="btn btn-success" onclick="openBankModal()">💰 存 / 提 / 轉</button>
+            </div>
+            <div id="bank_total_summary" style="background:#dcfce7; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #86efac; display:flex; flex-wrap:wrap; gap:20px; align-items:center;">
+                <h3 style="margin:0; color:#166534;">💰 資金總水位: <span id="total_fund_display">$0</span></h3>
+                <h3 style="margin:0; color:#c2410c; font-size:13px;">(另有廠商預付總額: <span id="total_prepaid_display">$0</span>)</h3>
+            </div>
+            <div class="form-grid" style="align-items:flex-end;">
+                <div class="form-group"><label>類型</label><select id="b_type" onchange="toggleCardInputs()"><option value="bank">銀行存摺</option><option value="credit">信用卡</option><option value="cash">現金(零用金)</option></select></div>
+                <div class="form-group"><label>名稱</label><input type="text" id="b_name" placeholder="名稱"></div>
+                <div class="form-group bank-only"><label>初始餘額</label><input type="number" id="b_bal" placeholder="0"></div>
+                <div class="form-group card-only hidden"><label>結帳日</label><input type="number" id="b_stmt" placeholder="27"></div>
+                <div class="form-group card-only hidden"><label>寬限期</label><input type="number" id="b_gap" placeholder="15"></div>
+                <button class="btn btn-primary" onclick="saveBank()">新增</button>
+            </div>
+        </div>
+        <div class="filter-bar">
+            <h5>🔍 存取紀錄篩選</h5>
+            <input type="date" id="fb_start" onchange="renderBanks()"><input type="date" id="fb_end" onchange="renderBanks()">
+        </div>
+        <div id="bank_card_list" class="dashboard-grid"></div>
+    </div>
+</div>
+
+<script>
+    let API_URL = 'https://script.google.com/macros/s/AKfycbxNRjcgN5vh0qxqK4F1Ni8EjUYv2Rid0P6hK79hyI_v9RrFPcbMPgNbP-gggMX7cVVH_A/exec'; 
+
+    window.onerror = function(msg, url, line) {
+        document.getElementById('error_rescue').style.display = 'block';
+        return false;
+    };
+
+    let db = { o: [], e: [], b: [], r: [], p: [], invPool: [] };
+    let Charts = { pie:null, line:null, bar:null, cust:null };
+    let sortState = { field: 'date', dir: 'desc' };
+    const PREPAID_KEY = 'PREPAID'; 
+
+    function showPartyPreview(name, type, e) {
+        const p = db.p.find(x => x.name == name && (type ? x.type == type : true));
+        if (!p) return;
+        let contactsHtml = '';
+        if(p.contacts && p.contacts.length > 0) {
+            contactsHtml = p.contacts.map(c => 
+                `<div class="preview-row"><span>${c.n || '無名'}</span><span>${c.p || ''} ${c.l ? `<span style="color:#16a34a; font-size:10px;">(L:${c.l})</span>`:''}</span></div>`
+            ).join('');
+        } else if (p.contact || p.phone) {
+            contactsHtml = `<div class="preview-row"><span>${p.contact || '無名'}</span><span>${p.phone || ''}</span></div>`;
+        }
+        const tooltip = document.getElementById('party_preview_tooltip');
+        let ppHtml = '';
+        if(p.type === 'v' && p.prepaid && p.prepaid !== 0) {
+            ppHtml = `<div style="margin-top:5px; padding:3px; background:#fff7ed; color:#c2410c; border:1px solid #ffedd5; font-weight:bold; text-align:center;">💰 預付餘額: $${Number(p.prepaid).toLocaleString()}</div>`;
+        }
+        tooltip.innerHTML = `
+            <div class="preview-title">
+                ${p.type === 'c' ? '👤 客戶詳情' : '🏭 廠商詳情'}
+            </div>
+            <div style="font-size:14px; font-weight:bold; margin-bottom:5px;">${p.name} ${p.isPrepaid?'<span class="prepaid-badge">預付</span>':''}</div>
+            <div style="margin-bottom:8px; color:#64748b; font-size:12px;">統編: ${p.tax || '無'}</div>
+            ${p.address ? `<div style="margin-bottom:2px;">📍 ${p.address}</div>` : ''}
+            ${ppHtml}
+            <div style="margin-top:8px; border-top:1px dashed #eee; padding-top:5px;">
+                <b style="font-size:12px; color:#475569;">聯絡窗口:</b>
+                ${contactsHtml || '<div style="color:#ccc;font-style:italic">無聯絡人資料</div>'}
+            </div>
+            ${p.note ? `<div style="margin-top:8px; padding:5px; background:#f8fafc; border-radius:4px; border:1px solid #e2e8f0; font-size:12px; color:#555;">📝 ${p.note}</div>` : ''}
+        `;
+        let left = e.clientX + 15; let top = e.clientY + 15;
+        if(left + 250 > window.innerWidth) left = e.clientX - 265;
+        tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px'; tooltip.style.display = 'block';
+    }
+    function hidePartyPreview() { document.getElementById('party_preview_tooltip').style.display = 'none'; }
+    function safeNum(v) { if (v === null || v === undefined || v === '') return 0; let n = parseFloat(String(v).replace(/[^\d.-]/g,'')); return isNaN(n) ? 0 : n; }
+
+    function loadDB() {
+        try {
+            const v7 = localStorage.getItem('erp_v7_db');
+            let data = v7 ? JSON.parse(v7) : { o:[], e:[], b:[{id:1, name:'現金', type:'cash', bal:0, hist:[]}], r:[], p:[], invPool: [] };
+            if(!data.invPool) data.invPool = [];
+            if(!data.b || data.b.length === 0) data.b = [{id:1, name:'現金', type:'cash', bal:0, hist:[]}];
+            return data;
+        } catch (e) { console.error("DB Load Error", e); document.getElementById('error_rescue').style.display = 'block'; return { o:[], e:[], b:[], r:[], p:[], invPool:[] }; }
+    }
+
+    window.onload = function() {
+        try {
+            db = loadDB();
+            if (!Array.isArray(db.b)) db.b = [{id:1, name:'現金', type:'cash', bal:0, hist:[]}];
+            db.b.forEach(b => { if(!b.type) b.type='bank'; b.bal = safeNum(b.bal); });
+            db.o.forEach(o => { 
+                o.price = safeNum(o.price); o.base = safeNum(o.base); o.tax = safeNum(o.tax); o.deposit = safeNum(o.deposit);
+                if(o.pay && o.pay.includes('尾款')) o.pay = '已收全款'; if(o.pay === '已結清') o.pay = '已收全款';
+                if(!o.subs) o.subs = [];
+                o.subs.forEach(s => { s.c = safeNum(s.c); if(!s.b) s.b = db.b[0]?.name || ''; });
+            });
+            db.e.forEach(e => { e.amt = safeNum(e.amt); e.base = safeNum(e.base); e.tax = safeNum(e.tax); });
+            db.r.forEach(r => r.amt = safeNum(r.amt));
+            db.p.forEach(p => { if(typeof p.prepaid === 'undefined') p.prepaid = 0; if(typeof p.isPrepaid === 'undefined') p.isPrepaid = false; });
+
+            if (!API_URL || API_URL.includes('請將')) { let stored = localStorage.getItem('erp_api_url'); if(stored) API_URL = stored; }
+            if (API_URL && !API_URL.includes('請將')) syncData(); else setStatus('err', '離線 (請設定)');
+            
+            renderAll(); updateInvPoolUI();
+            document.getElementById('o_date').valueAsDate = new Date(); document.getElementById('e_date').valueAsDate = new Date();
+        } catch(err) { console.error(err); document.getElementById('error_rescue').style.display = 'block'; }
+    };
+
+    function save() { localStorage.setItem('erp_v7_db', JSON.stringify(db)); renderAll(); updateInvPoolUI(); pushData(); }
+    function setDateRange(type, prefix) {
+        const now = new Date(); let start, end; const y = now.getFullYear(); const m = now.getMonth();
+        if (type === 'month') { start = new Date(y, m, 1); end = new Date(y, m + 1, 0); } 
+        else if (type === 'quarter') { const q = Math.floor(m / 3); start = new Date(y, q * 3, 1); end = new Date(y, (q + 1) * 3, 0); } 
+        else if (type === 'year') { start = new Date(y, 0, 1); end = new Date(y, 11, 31); }
+        const toISO = (d) => { const offset = d.getTimezoneOffset(); const local = new Date(d.getTime() - (offset*60*1000)); return local.toISOString().split('T')[0]; };
+        document.getElementById(prefix + '_start').value = toISO(start); document.getElementById(prefix + '_end').value = toISO(end);
+        if (prefix === 'fo') renderOrders(); else if (prefix === 'fr') renderRecurring(); else if (prefix === 'fe') renderExpenses();
+    }
+    function openConfig() { document.getElementById('configModal').style.display='flex'; document.getElementById('api_url_input').value = (API_URL.includes('請將') ? '' : API_URL); }
+    function closeConfig() { document.getElementById('configModal').style.display='none'; }
+    function setStatus(s,t) { document.querySelector('.dot').className='dot '+s; document.querySelector('.sync-status span').innerText=t; }
+    function testConnection() { let u = document.getElementById('api_url_input').value.trim(); if(!u) return; fetch(u).then(r=>r.json()).then(d=>{ API_URL=u; localStorage.setItem('erp_api_url',u); closeConfig(); syncData(true); }).catch(e=>alert('連線失敗')); }
+    function syncData(force=false) { if(!API_URL || API_URL.includes('請將')) return; setStatus('sync','同步中'); fetch(API_URL).then(r=>r.json()).then(d=>{ if(force||(d.o&&d.o.length>0)){ db=d; save(); setStatus('ok','已連線'); if(force) alert("同步完成"); } else { pushData(); } }).catch(e=>setStatus('err','離線')); }
+    function pushData() { if(API_URL && !API_URL.includes('請將')) fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(db)}); }
+
+    function openPrepaidModal() {
+        document.getElementById('prepaidModal').style.display = 'flex';
+        renderPrepaidList();
+        const vlist = document.getElementById('vlist_prepaid'); vlist.innerHTML = db.p.filter(p => p.type === 'v').map(p => `<option value="${p.name}">`).join('');
+        document.getElementById('pp_source_bank').innerHTML = db.b.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+    }
+    function renderPrepaidList() {
+        const div = document.getElementById('prepaid_list_div');
+        const list = db.p.filter(p => p.type === 'v' && p.prepaid && p.prepaid !== 0).sort((a,b) => b.prepaid - a.prepaid);
+        if(list.length === 0) { div.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">目前無任何預付餘額</div>'; return; }
+        div.innerHTML = list.map(p => `
+            <div class="prepaid-row">
+                <div>
+                    <div style="font-weight:bold;">${p.name}</div>
+                    <div style="font-size:12px; color:#666;">${p.tax || ''}</div>
+                </div>
+                <div class="prepaid-bal ${p.prepaid < 0 ? 'is-neg' : ''}" style="color:${p.prepaid>0?'#059669':'#ef4444'}">
+                    $${Number(p.prepaid).toLocaleString()}
+                </div>
+            </div>
+        `).join('');
+    }
+    function doPrepaidTopUp() {
+        const vName = document.getElementById('pp_vendor').value.trim();
+        const bName = document.getElementById('pp_source_bank').value;
+        const amt = safeNum(document.getElementById('pp_amt').value);
+        const note = document.getElementById('pp_note').value;
+        if(!vName || amt <= 0) { alert("請輸入廠商名稱及有效金額"); return; }
+        
+        checkAndAddParty(vName, 'v');
+        const p = db.p.find(x => x.name === vName && x.type === 'v');
+        if(!p) { alert("廠商建立失敗"); return; }
+        if(typeof p.prepaid === 'undefined') p.prepaid = 0;
+
+        updateBank(bName, -amt, `[預付儲值] ${vName} - ${note}`);
+        p.prepaid = Number(p.prepaid) + amt;
+        
+        alert(`已成功儲值 $${amt} 給 ${vName}！\n目前餘額: $${p.prepaid}`);
+        document.getElementById('pp_amt').value = ''; document.getElementById('pp_note').value = '';
+        renderPrepaidList(); save();
+    }
+
+    function openInvModal() { document.getElementById('invModal').style.display = 'flex'; updateInvPoolUI(); }
+    function addInvoiceRange() {
+        let prefix = document.getElementById('inv_prefix').value.trim().toUpperCase();
+        let start = parseInt(document.getElementById('inv_start').value);
+        let end = parseInt(document.getElementById('inv_end').value);
+        if(!prefix || isNaN(start) || isNaN(end) || start > end) { alert('請檢查輸入資料格式！'); return; }
+        let count = 0; for(let i = start; i <= end; i++) { db.invPool.push(prefix + '-' + String(i).padStart(8, '0')); count++; }
+        save(); updateInvPoolUI(); alert(`成功匯入 ${count} 組發票號碼！`);
+    }
+    function clearInvoicePool() { if(confirm('確定要清空所有未使用的發票號碼嗎？')) { db.invPool = []; save(); updateInvPoolUI(); } }
+    function updateInvPoolUI() {
+        let count = db.invPool ? db.invPool.length : 0;
+        let next = count > 0 ? db.invPool[0] : '無';
+        if(document.getElementById('inv_pool_count')) { document.getElementById('inv_pool_count').innerText = count; document.getElementById('inv_next_val').innerText = '下一張: ' + next; }
+        let alertBox = document.getElementById('inv_alert_box'); if(alertBox) alertBox.style.display = (count < 5 && count > 0) ? 'block' : 'none';
+    }
+
+    // Check if Vendor is Prepaid and auto-select bank (V7.70 Fix: Only auto-select bank, do NOT change status)
+    function checkVendorPrepaidStatus(input) {
+        const vName = input.value.trim();
+        if(!vName) return;
+        const p = db.p.find(x => x.name === vName && x.type === 'v');
+        const container = input.parentElement;
+        const bankSelect = container.querySelector('.sb');
+        
+        if (p && p.isPrepaid) {
+            if(bankSelect.value !== PREPAID_KEY) {
+                bankSelect.value = PREPAID_KEY;
+                // Only Visual feedback
+                bankSelect.style.border = "2px solid #f97316"; 
+                setTimeout(() => bankSelect.style.border = "1px solid #cbd5e1", 1000);
+            }
+        }
+    }
+
+    // V7.69 Safe Tax Calc
+    function calcTax(prefix, mode) {
+        try {
+            // Determine IDs based on prefix (o=order, e=expense)
+            let idTotal = prefix === 'o' ? 'o_price' : 'e_amt';
+            let idBase = prefix + '_base';
+            let idTax = prefix + '_tax';
+
+            let elTotal = document.getElementById(idTotal);
+            let elBase = document.getElementById(idBase);
+            let elTax = document.getElementById(idTax);
+
+            if (!elTotal || !elBase || !elTax) return; 
+
+            if (mode === 'total') {
+                let total = safeNum(elTotal.value);
+                let base = Math.round(total / 1.05);
+                let tax = total - base;
+                elBase.value = base;
+                elTax.value = tax;
+            } else {
+                let base = safeNum(elBase.value);
+                let total = Math.round(base * 1.05);
+                let tax = total - base;
+                elTotal.value = total;
+                elTax.value = tax;
+            }
+        } catch (e) {
+            console.error("Tax Calc Error", e);
+        }
+    }
+
+    function saveOrder() {
+        try {
+            if (!confirm('確定要儲存訂單嗎？')) return;
+            const id = document.getElementById('o_edit_id').value;
+            let invNum = document.getElementById('o_inv_num').value.trim();
+            let invoiceType = document.getElementById('o_invoice').value;
+            if ((!invNum && (invoiceType === '二聯' || invoiceType === '三聯'))) {
+                if (db.invPool && db.invPool.length > 0) invNum = db.invPool.shift(); 
+                else if(!id) alert('⚠️ 發票號碼庫存已用盡！');
+            }
+            const o = {
+                id: id ? Number(id) : Date.now(),
+                date: document.getElementById('o_date').value,
+                proj: document.getElementById('o_proj').value,
+                cust: document.getElementById('o_cust').value,
+                invoice: invoiceType, invNum: invNum, 
+                price: safeNum(document.getElementById('o_price').value),
+                base: safeNum(document.getElementById('o_base').value), tax: safeNum(document.getElementById('o_tax').value),
+                deposit: safeNum(document.getElementById('o_deposit').value),
+                inv: document.getElementById('o_inv').value, pay: document.getElementById('o_pay').value, bank: document.getElementById('o_bank').value,
+                note: document.getElementById('o_note').value, subs: []
+            };
+            checkAndAddParty(o.cust,'c');
+            document.querySelectorAll('#sub_area .form-grid').forEach(el=>{
+                let sub = { v: el.querySelector('.sv').value, c: safeNum(el.querySelector('.sc').value), s: el.querySelector('.ss').value, b: el.querySelector('.sb').value };
+                // V7.68 Fix: Removed forced status override. Trust user input.
+                o.subs.push(sub); checkAndAddParty(sub.v, 'v');
+            });
+
+            if(!id){ 
+                if(o.pay=='已收全款') updateBank(o.bank,o.price,'[全額] '+o.proj);
+                else if(o.pay=='已收訂金') updateBank(o.bank,o.deposit,'[訂金] '+o.proj);
+                o.subs.forEach(sub => { 
+                    if(sub.s == '已支付') {
+                        if(sub.b === PREPAID_KEY) {
+                            let p = db.p.find(x => x.name === sub.v && x.type === 'v');
+                            if(p) { if(typeof p.prepaid==='undefined') p.prepaid=0; p.prepaid = Number(p.prepaid) - sub.c; }
+                        } else { updateBank(sub.b, -sub.c, '[包] ' + sub.v + ' - ' + o.proj); }
+                    }
+                });
+                db.o.unshift(o);
+            } else { 
+                let old = db.o.find(x => x.id == Number(id));
+                if(old) {
+                    if (old.invNum && (invoiceType === '無' || !invNum)) { if (!db.invPool.includes(old.invNum)) { db.invPool.unshift(old.invNum); db.invPool.sort(); alert(`發票號碼 ${old.invNum} 已回收至庫存！`); } }
+                    
+                    if (old.pay === '已收全款' && o.pay === '未收款') updateBank(o.bank, -old.price, `[反悔退] ${o.proj} (全額)`);
+                    else if (old.pay === '已收全款' && o.pay === '已收訂金') updateBank(o.bank, -(old.price - o.deposit), `[反悔退] ${o.proj} (尾款)`);
+                    else if (old.pay === '已收訂金' && o.pay === '未收款') updateBank(o.bank, -old.deposit, `[反悔退] ${o.proj} (訂金)`);
+                    else if (o.pay == '已收全款' && old.pay != '已收全款') {
+                        if (old.pay == '已收訂金') { let bal = o.price - o.deposit; if(bal > 0) updateBank(o.bank, bal, '[尾款] '+o.proj); } 
+                        else updateBank(o.bank, o.price, '[全額] '+o.proj); 
+                    } else if (o.pay == '已收訂金' && old.pay == '未收款') updateBank(o.bank, o.deposit, '[訂金] '+o.proj); 
+
+                    // V7.68 Fix: Refund Logic for Prepaid
+                    old.subs.forEach((os, idx) => {
+                        let ns = o.subs[idx];
+                        if(!ns) return;
+
+                        if (os.s === '已支付' && ns.s !== '已支付') {
+                            if (os.b === PREPAID_KEY) {
+                                let p = db.p.find(x => x.name === os.v && x.type === 'v');
+                                if(p) p.prepaid = Number(p.prepaid || 0) + os.c; 
+                            } else { updateBank(os.b, os.c, `[修正退] ${os.v} - ${o.proj}`); }
+                        }
+                        else if (os.s !== '已支付' && ns.s === '已支付') {
+                            if (ns.b === PREPAID_KEY) {
+                                let p = db.p.find(x => x.name === ns.v && x.type === 'v');
+                                if(p) p.prepaid = Number(p.prepaid || 0) - ns.c;
+                            } else { updateBank(ns.b, -ns.c, `[包] ${ns.v} - ${o.proj}`); }
+                        }
+                        else if (os.s === '已支付' && ns.s === '已支付' && os.c !== ns.c) {
+                             let diff = os.c - ns.c;
+                             if (ns.b === PREPAID_KEY) {
+                                 let p = db.p.find(x => x.name === ns.v && x.type === 'v');
+                                 if(p) p.prepaid = Number(p.prepaid || 0) + diff;
+                             } else { updateBank(ns.b, diff, `[修正] ${ns.v} - ${o.proj}`); }
+                        }
+                    });
+                    
+                    // Handle new added subs in edit mode
+                    for(let i=old.subs.length; i<o.subs.length; i++) {
+                        let ns = o.subs[i];
+                        if (ns.s === '已支付') {
+                            if (ns.b === PREPAID_KEY) {
+                                let p = db.p.find(x => x.name === ns.v && x.type === 'v');
+                                if(p) p.prepaid = Number(p.prepaid || 0) - ns.c;
+                            } else { updateBank(ns.b, -ns.c, `[包] ${ns.v} - ${o.proj}`); }
+                        }
+                    }
+                }
+                db.o[db.o.findIndex(x=>x.id==Number(id))]=o; 
+            }
+            document.getElementById('orderForm').reset(); document.getElementById('sub_area').innerHTML=''; document.getElementById('o_edit_id').value=''; save(); updateInvPoolUI(); 
+        } catch(err) { console.error(err); alert("儲存時發生錯誤，請檢查資料"); }
+    }
+
+    function sortOrders(field) {
+        if (sortState.field === field) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+        else { sortState.field = field; sortState.dir = 'desc'; }
+        document.querySelectorAll('th span').forEach(s => s.innerText = '');
+        document.getElementById('sort_' + field).innerText = sortState.dir === 'asc' ? '▲' : '▼';
+        renderOrders();
+    }
+    function renderOrders() {
+        const k = document.getElementById('s_key_o').value.toLowerCase();
+        const pay = document.getElementById('fo_pay').value;
+        const inv = document.getElementById('fo_inv').value;
+        const list = db.o.filter(o => {
+            let subNames = o.subs.map(s => s.v).join(' ');
+            let searchTarget = (o.proj + o.cust + (o.invNum || '') + (o.note || '') + o.price + o.deposit + subNames).toLowerCase();
+            let m = searchTarget.includes(k);
+            if(inv && o.inv!=inv) m=false;
+            if(pay=='未收款') { if(o.pay=='已收全款') m=false; } else if(pay=='已收款') { if(o.pay!='已收全款') m=false; }
+            const s = document.getElementById('fo_start').value; const e = document.getElementById('fo_end').value;
+            if (s && o.date < s) m=false; if (e && o.date > e) m=false;
+            return m;
+        });
+        
+        let totalAmt = 0; let totalProfit = 0;
+        list.forEach(o => { let cost = o.subs.reduce((acc, s) => acc + s.c, 0); totalAmt += o.price; totalProfit += (o.price - cost); });
+        document.getElementById('order_search_summary').innerHTML = `📊 搜尋小計 (共 ${list.length} 筆): <span style="color:#2563eb">總額 $${totalAmt.toLocaleString()}</span> | <span style="color:#16a34a">利潤 $${totalProfit.toLocaleString()}</span>`;
+
+        list.sort((a, b) => {
+            let valA = a[sortState.field]; let valB = b[sortState.field];
+            if(sortState.field === 'price') return sortState.dir === 'asc' ? valA - valB : valB - valA;
+            if (valA < valB) return sortState.dir === 'asc' ? -1 : 1;
+            if (valA > valB) return sortState.dir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        document.getElementById('o_list').innerHTML = list.map(o => {
+            let status = `<span class="badge ${o.pay=='已收全款'?'b-green':(o.pay=='已收訂金'?'b-blue':'b-red')}">${o.pay}</span>`;
+            if(o.pay=='已收訂金') { let bal=o.price-o.deposit; status+=`<br><small style="color:#d97706;font-weight:bold;">(訂:$${o.deposit.toLocaleString()} / 尾:$${bal.toLocaleString()})</small>`; }
+            let totalSub = o.subs.reduce((sum, sub) => sum + sub.c, 0);
+            let profit = o.price - totalSub;
+            let subs = o.subs.map(s=>{
+                let bankDisplay = s.b === PREPAID_KEY ? '<b style="color:#c2410c">🔴預付</b>' : s.b;
+                return `<div class="sub-item"><span class="${s.s=='已支付'?'b-green':'b-red'}">●</span> ${s.v} $${s.c.toLocaleString()} <span style="color:#94a3b8;font-size:10px;">(${bankDisplay})</span></div>`;
+            }).join('');
+            return `<tr><td>${o.date}</td><td><b>${o.proj}</b><br><small class="hover-info" onmouseenter="showPartyPreview('${o.cust}','c',event)" onmouseleave="hidePartyPreview()">${o.cust}</small></td><td style="color:#4f46e5; font-weight:bold;">${o.invNum || '-'}</td><td>總:$${o.price.toLocaleString()}<br><small style="color:${profit>=0?'#10b981':'#ef4444'}">利:$${profit.toLocaleString()}</small></td><td>${status}</td><td>${subs||'-'}</td><td><button class="btn btn-sm btn-primary" onclick="editO(${o.id})">編</button><button class="btn btn-sm btn-danger" onclick="del('o',${o.id})">刪</button></td></tr>`;
+        }).join('');
+    }
+
+    function saveRecurring(){
+        if (!confirm('確定要儲存固定支出嗎？')) return;
+        const id=document.getElementById('r_edit_id').value,cy=Number(document.getElementById('r_cycle_val').value),r={id:id?Number(id):Date.now(),title:document.getElementById('r_title').value,amt:safeNum(document.getElementById('r_amt').value),period:document.getElementById('r_period').value,cycleVal:cy,start:document.getElementById('r_start').value,end:document.getElementById('r_end').value,bank:document.getElementById('r_bank').value,note:document.getElementById('r_note').value,nextDate:calcNext(document.getElementById('r_start').value,document.getElementById('r_period').value,cy)};if(id)db.r[db.r.findIndex(x=>x.id==id)]=r;else db.r.push(r);document.getElementById('recurForm').reset();document.getElementById('r_edit_id').value='';save();
+    }
+    function payRecur(id,d){const r=db.r.find(x=>x.id==id);if(!confirm(`支付 ${r.title}?`))return;updateBank(r.bank,-r.amt,'[固] '+r.title);db.e.unshift({id:Date.now(),date:d,note:`(固)${r.title}`,target:'-',amt:r.amt,base:Math.round(r.amt/1.05),tax:r.amt-Math.round(r.amt/1.05),bank:r.bank,status:'已支付',remark:r.note,linkId:r.id});r.nextDate=calcNext(r.nextDate,r.period,r.cycleVal);save();}
+    function renderRecurring(){
+        const k=document.getElementById('s_key_r').value.toLowerCase();
+        const s=document.getElementById('fr_start').value, e=document.getElementById('fr_end').value;
+        const list = db.r.filter(r => { let m = r.title.toLowerCase().includes(k); if(s && r.nextDate < s) m=false; if(e && r.nextDate > e) m=false; return m; });
+        document.getElementById('r_list').innerHTML=list.map(r=>{let ds=getNext5(r.nextDate,r.period,r.cycleVal,r.end); return `<tr><td><b>${r.title}</b><br><small style='color:#666'>${r.note||''}</small></td><td>${r.bank}</td><td>$${r.amt.toLocaleString()}</td><td>${ds.map(d=>`<button class="btn btn-outline btn-sm" onclick="payRecur(${r.id},'${d}')">${d}</button>`).join(' ')}</td><td><button class="btn btn-sm btn-primary" onclick="editR(${r.id})">編</button><button class="btn btn-sm btn-danger" onclick="del('r',${r.id})">刪</button></td></tr>`}).join('');
+    }
+
+    function saveExpense() {
+        if (!confirm('確定要儲存支出嗎？')) return;
+        const id = document.getElementById('e_edit_id').value; const bn = document.getElementById('e_bank').value; const amt = safeNum(document.getElementById('e_amt').value);
+        const e = { id: id ? Number(id) : Date.now(), date: document.getElementById('e_date').value, note: document.getElementById('e_note').value, target: document.getElementById('e_target').value, amt: amt, base: safeNum(document.getElementById('e_base').value), tax: safeNum(document.getElementById('e_tax').value), bank: bn, status: document.getElementById('e_status').value, remark: document.getElementById('e_remark').value };
+        if(!id) { if(e.status === '已支付') updateBank(bn, -amt, `[支] ${e.note}`); db.e.unshift(e); } 
+        else {
+            let old = db.e.find(x => x.id == Number(id));
+            if(old) {
+                if (old.status === '已支付' && e.status === '未支付') updateBank(old.bank, old.amt, `[反悔退] ${old.note}`);
+                else if (old.status !== '已支付' && e.status === '已支付') updateBank(e.bank, -e.amt, `[支] ${e.note}`);
+                else if (old.status === '已支付' && e.status === '已支付') { if (old.bank !== e.bank) { updateBank(old.bank, old.amt, `[轉出] ${old.note} (換行)`); updateBank(e.bank, -e.amt, `[轉入] ${e.note} (換行)`); } else if (old.amt !== e.amt) { let diff = old.amt - e.amt; updateBank(e.bank, diff, `[修正] ${e.note}`); } }
+            }
+            db.e[db.e.findIndex(x=>x.id==Number(id))] = e;
+        }
+        document.getElementById('expForm').reset(); document.getElementById('e_edit_id').value=''; save();
+    }
+    function renderExpenses(){
+        const k=document.getElementById('s_key_e').value.toLowerCase(), st=document.getElementById('fe_status').value; const s=document.getElementById('fe_start').value, e=document.getElementById('fe_end').value;
+        const list = db.e.filter(e => { let m = (e.note+e.target).toLowerCase().includes(k); if(st && e.status != st) m=false; if(s && e.date < s) m=false; if(e && e.date > e) m=false; return m; });
+        document.getElementById('e_list').innerHTML=list.map(e=>`<tr><td>${e.date}</td><td>${e.note}<br><small style='color:#666'>${e.remark||''}</small></td><td class="hover-info" onmouseenter="showPartyPreview('${e.target}','v',event)" onmouseleave="hidePartyPreview()">${e.target||''}</td><td>$${e.amt.toLocaleString()}</td><td>${e.bank}</td><td><span class="badge ${e.status=='已支付'?'b-green':'b-red'}">${e.status}</span></td><td><button class="btn btn-sm btn-primary" onclick="editE(${e.id})">編</button><button class="btn btn-sm btn-danger" onclick="del('e',${e.id})">刪</button></td></tr>`).join('');
+    }
+
+    function saveBank() { const n=document.getElementById('b_name').value, t=document.getElementById('b_type').value; if(!n) return; const b = {id:Date.now(), name:n, type:t, bal:safeNum(document.getElementById('b_bal').value), stmtDay:27, payGap:15, hist:[]}; db.b.push(b); document.getElementById('b_name').value=''; save(); }
+    function renderBanks() {
+        const s = document.getElementById('fb_start').value, e = document.getElementById('fb_end').value;
+        let total = db.b.reduce((acc, b) => acc + safeNum(b.bal), 0);
+        let totalPrepaid = db.p.reduce((acc, p) => acc + (p.prepaid || 0), 0);
+        let totalEl = document.getElementById('total_fund_display'); if(totalEl) { totalEl.innerText = '$' + total.toLocaleString(); totalEl.style.color = total >= 0 ? '#166534' : '#ef4444'; }
+        let totalPPEl = document.getElementById('total_prepaid_display'); if(totalPPEl) { totalPPEl.innerText = '$' + totalPrepaid.toLocaleString(); totalPPEl.style.color = totalPrepaid >= 0 ? '#166534' : '#ef4444'; }
+        document.getElementById('bank_card_list').innerHTML = db.b.map(b => {
+            let hist = b.hist.filter(h => (!s||h.date>=s)&&(!e||h.date<=e));
+            let colorClass = b.type=='credit' ? 'bg-g-red' : (b.type=='cash' ? 'bg-g-orange' : 'bg-g-green');
+            return `<div class="kpi-card ${colorClass}"><h3>${b.name}</h3><div class="val">${b.type=='credit'?'卡':(b.type=='cash'?'現':'銀')}:$${b.bal.toLocaleString()}</div><div class="bank-history">${hist.map(h=>`<div class="bank-item"><span>${h.date} ${h.note}</span><span>$${h.amt}</span></div>`).join('')}</div><button class="btn btn-sm btn-danger" style="margin-top:5px" onclick="del('b',${b.id})">刪除</button></div>`;
+        }).join('');
+    }
+    
+    function openBankModal(){ document.getElementById('bankModal').style.display='flex'; document.getElementById('bt_date').valueAsDate=new Date(); updateBankSelects(); toggleBankTransFields(); }
+    function closeBankModal(){ document.getElementById('bankModal').style.display='none'; }
+    function toggleBankTransFields(){ const t = document.getElementById('bt_type').value; document.getElementById('div_target').classList.toggle('hidden', t !== 'transfer'); document.getElementById('lbl_source').innerText = (t==='deposit' ? '存入帳戶' : (t==='withdraw' ? '提款帳戶' : '轉出帳戶')); }
+    function saveBankTrans(){
+        const t = document.getElementById('bt_type').value; const src = document.getElementById('bt_source').value; const tgt = document.getElementById('bt_target').value; const amt = safeNum(document.getElementById('bt_amt').value); const note = document.getElementById('bt_note').value;
+        if(amt <= 0){ alert('金額必須大於 0'); return; } if(!src){ alert('請選擇帳戶'); return; } if(t==='transfer' && src===tgt){ alert('轉出與轉入帳戶不能相同'); return; }
+        if(t === 'deposit') updateBank(src, amt, `[存] ${note}`); else if(t === 'withdraw') updateBank(src, -amt, `[提] ${note}`); else if(t === 'transfer'){ updateBank(src, -amt, `[轉出->${tgt}] ${note}`); updateBank(tgt, amt, `[轉入<-${src}] ${note}`); }
+        save(); alert('交易已記錄'); closeBankModal(); document.getElementById('bt_amt').value=''; document.getElementById('bt_note').value='';
+    }
+
+    function updateBankSelects(){
+        const h=db.b.map(b=>`<option value="${b.name}">${b.name}</option>`).join('');
+        document.querySelectorAll('.bank-sel').forEach(s=>{ if(s.id !== 'bt_target' && s.id !== 'bt_source' && s.id !== 'pp_source_bank') s.innerHTML=h; }); 
+        const ms = document.getElementById('bt_source'); if(ms) ms.innerHTML = h; 
+        const mt = document.getElementById('bt_target'); if(mt) mt.innerHTML = h;
+        const pp = document.getElementById('pp_source_bank'); if(pp) pp.innerHTML = h;
+    }
+    function getBankOptions(selectedBank) {
+        let opts = db.b.map(b => `<option value="${b.name}" ${b.name===selectedBank?'selected':''}>${b.name}</option>`).join('');
+        if(selectedBank === PREPAID_KEY) opts += `<option value="${PREPAID_KEY}" selected>🔴 預付扣款</option>`;
+        return opts;
+    }
+    function toggleCardInputs(){ const t=document.getElementById('b_type').value; document.querySelectorAll('.card-only').forEach(e=>e.classList.toggle('hidden',t!='credit')); document.querySelectorAll('.bank-only').forEach(e=>e.classList.toggle('hidden',t=='credit')); }
+    
+    function addSubRow(v='',c='',s='未支付',b=''){
+        const d=document.createElement('div'); d.className='form-grid'; d.style.marginBottom='5px';
+        const bankOpts = db.b.map(bank => `<option value="${bank.name}" ${bank.name===b?'selected':''}>${bank.name}</option>`).join('') + 
+                         `<option value="${PREPAID_KEY}" ${b===PREPAID_KEY?'selected':''}>🔴 預付扣款</option>`;
+        d.innerHTML=`<input class="sv" value="${v}" list="vlist" placeholder="廠商" onchange="checkVendorPrepaidStatus(this)" onblur="checkVendorPrepaidStatus(this)"><input type="number" class="sc" value="${c}" placeholder="金額"><select class="ss"><option ${s=='未支付'?'selected':''}>未支付</option><option ${s=='已支付'?'selected':''}>已支付</option></select><select class="sb">${bankOpts}</select><button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">X</button>`;
+        document.getElementById('sub_area').appendChild(d);
+        if(v) checkVendorPrepaidStatus(d.querySelector('.sv')); // Check on load
+    }
+    
+    function addContactRow(name='', phone='', line='') {
+        const d = document.createElement('div'); d.className = 'form-grid contact-row'; d.style.marginBottom = '5px';
+        d.innerHTML = `<input class="c-name" value="${name}" placeholder="聯絡人姓名"><input class="c-phone" value="${phone}" placeholder="聯絡電話/分機"><input class="c-line" value="${line}" placeholder="Line ID"><button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">X</button>`;
+        document.getElementById('contact_area').appendChild(d);
+    }
+
+    function checkAndAddParty(n,t){if(!n)return;if(!db.p.some(p=>p.name==n&&p.type==t))db.p.push({id:Date.now(),name:n,type:t,prepaid:0,isPrepaid:false});renderParties();}
+    function calcNext(s,p,d){let dt=new Date(s),y=dt.getFullYear(),m=dt.getMonth();if(p=='monthly'){m++;if(m>11){m=0;y++}}else{y++}return new Date(y,m,d).toISOString().slice(0,10);}
+    function calcPrev(s,p,d){let dt=new Date(s),y=dt.getFullYear(),m=dt.getMonth();if(p=='monthly'){m--;if(m<0){m=11;y--}}else{y--}let n=new Date(y,m,d);if(n.getMonth()!=m)n=new Date(y,m+1,0);return n.toISOString().split('T')[0];}
+    function getNext5(s,p,d,e){let arr=[],c=s;for(let i=0;i<5;i++){if(c>e)break;arr.push(c);c=calcNext(c,p,d)}return arr;}
+    
+    function saveParty(){
+        if (!confirm('確定要儲存名單嗎？')) return;
+        const id=document.getElementById('p_edit_id').value; const contacts = [];
+        document.querySelectorAll('.contact-row').forEach(row => { const n = row.querySelector('.c-name').value.trim(); const p = row.querySelector('.c-phone').value.trim(); const l = row.querySelector('.c-line').value.trim(); if(n || p || l) contacts.push({ n, p, l }); });
+        const p = { id: id ? Number(id) : Date.now(), type: document.getElementById('p_type').value, name: document.getElementById('p_name').value, tax: document.getElementById('p_tax').value, address: document.getElementById('p_address').value, note: document.getElementById('p_note').value, contacts: contacts, contact: contacts.length > 0 ? contacts[0].n : '', phone: contacts.length > 0 ? contacts[0].p : '' };
+        
+        p.isPrepaid = document.getElementById('p_is_prepaid').checked;
+
+        if(id) { let old = db.p.find(x=>x.id==id); p.prepaid = old.prepaid || 0; db.p[db.p.findIndex(x=>x.id==id)]=p; } else { p.prepaid=0; db.p.push(p); }
+        document.getElementById('partyForm').reset(); document.getElementById('contact_area').innerHTML=''; document.getElementById('p_edit_id').value=''; save();
+    }
+    
+    function renderParties(){
+        const k = document.getElementById('s_key_p') ? document.getElementById('s_key_p').value.toLowerCase() : '';
+        const filterFunc = p => {
+            let basicMatch = (p.name + (p.tax||'') + (p.address||'') + (p.note||'')).toLowerCase().includes(k);
+            if (basicMatch) return true;
+            if (p.contacts && Array.isArray(p.contacts)) return p.contacts.some(c => (c.n + c.p + c.l).toLowerCase().includes(k));
+            return ((p.contact||'') + (p.phone||'')).toLowerCase().includes(k);
+        };
+        const renderTable = (type) => db.p.filter(p => p.type == type && filterFunc(p)).map(p => 
+            `<tr><td class="hover-info" onmouseenter="showPartyPreview('${p.name}','${type}',event)" onmouseleave="hidePartyPreview()"><b>${p.name}</b>${p.isPrepaid?'<span class="prepaid-badge">預付</span>':''} ${p.note ? '<span style="color:orange">●</span>' : ''}</td><td><button class="btn btn-sm btn-warning" onclick="showStmt(${p.id})">對帳</button> <button class="btn btn-sm btn-primary" onclick="editP(${p.id})">編</button> <button class="btn btn-sm btn-danger" onclick="del('p',${p.id})">刪</button></td></tr>`
+        ).join('');
+        document.getElementById('c_table').querySelector('tbody').innerHTML = renderTable('c'); 
+        document.getElementById('v_table').querySelector('tbody').innerHTML = renderTable('v'); 
+        document.getElementById('clist').innerHTML=db.p.filter(x=>x.type=='c').map(x=>`<option value="${x.name}">`).join(''); 
+        document.getElementById('vlist').innerHTML=db.p.filter(x=>x.type=='v').map(x=>`<option value="${x.name}">`).join('');
+    }
+    
+    let currentPid=null;
+    function showStmt(id){
+        currentPid = Number(id); document.getElementById('statementModal').style.display='flex';
+        let d = new Date(); document.getElementById('modal_start').value = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]; document.getElementById('modal_end').value = new Date(d.getFullYear(), d.getMonth()+1, 0).toISOString().split('T')[0];
+        const p = db.p.find(x => x.id == currentPid); const filterSel = document.getElementById('modal_filter'); filterSel.innerHTML = '';
+        if(p && p.type === 'c'){ filterSel.innerHTML = `<option value="all">全部顯示</option><option value="unpaid" selected>未結清 (含訂金)</option><option value="paid">已結清</option>`; } 
+        else { filterSel.innerHTML = `<option value="all">全部顯示</option><option value="unpaid" selected>未付款</option><option value="paid">已付款</option>`; }
+        refreshStatement();
+    }
+    function closeModal(){document.getElementById('statementModal').style.display='none';}
+    
+    function updateStmtBank(el, type, id, subIdx) {
+        let newBank = el.value, oldBank = "", amount = 0, isPaid = false, note = "";
+        if(type === 'o_main') {
+            let o = db.o.find(x => x.id == id); oldBank = o.bank; o.bank = newBank; isPaid = (o.pay === '已收全款' || o.pay === '已收訂金'); amount = (o.pay === '已收全款') ? safeNum(o.price) : safeNum(o.deposit); note = `[轉帳] ${o.proj} (更換收款銀行)`;
+        } else if (type === 'o_sub') {
+            let o = db.o.find(x => x.id == id); let sub = o.subs[subIdx]; oldBank = sub.b; 
+            if(oldBank === PREPAID_KEY) { 
+                alert("此項目目前為預付扣款，請至訂單編輯頁面修改。"); 
+                refreshStatement(); 
+                return; 
+            }
+             if (newBank === PREPAID_KEY) { 
+                alert("請進入訂單編輯模式來使用預付扣款功能，以確保餘額正確扣除。"); 
+                refreshStatement(); 
+                return; 
+            }
+            sub.b = newBank; isPaid = (sub.s === '已支付'); amount = -safeNum(sub.c); note = `[轉帳] ${sub.v} - ${o.proj} (更換付款銀行)`;
+        } else if (type === 'e') {
+            let e = db.e.find(x => x.id == id); oldBank = e.bank; e.bank = newBank; isPaid = (e.status === '已支付'); amount = -safeNum(e.amt); note = `[轉帳] ${e.note} (更換付款銀行)`;
+        }
+        if (isPaid && oldBank !== newBank) { updateBank(oldBank, -amount, note + " 轉出"); updateBank(newBank, amount, note + " 轉入"); alert(`已將款項從 ${oldBank} 移轉至 ${newBank}`); }
+        save(); renderAll();
+    }
+
+    function toggleStmtStatus(type, id, subIdx) {
+        try {
+            if(!confirm('確定要變更收款/付款狀態嗎？\n(資金/餘額將自動連動)')) return;
+            if (type === 'o_main') {
+                let o = db.o.find(x => x.id == id); if (!o) return;
+                let price = safeNum(o.price), deposit = safeNum(o.deposit);
+                if (o.pay === '已收全款') { updateBank(o.bank, -price, `[反悔退] ${o.proj}`); o.pay = '未收款'; } 
+                else if (o.pay === '已收訂金') { let bal = price - deposit; updateBank(o.bank, bal, `[對帳收] ${o.proj} (尾款)`); o.pay = '已收全款'; } 
+                else { updateBank(o.bank, price, `[對帳收] ${o.proj}`); o.pay = '已收全款'; }
+            } else if (type === 'o_sub') {
+                let o = db.o.find(x => x.id == id); if (!o || !o.subs[subIdx]) return;
+                let sub = o.subs[subIdx], cost = safeNum(sub.c);
+                let p = db.p.find(x => x.name === sub.v && x.type === 'v');
+                let isPrepaidVendor = (p && p.isPrepaid);
+                
+                if(sub.b === PREPAID_KEY) {
+                    if(p) {
+                        if (sub.s === '已支付') { p.prepaid = Number(p.prepaid) + cost; sub.s = '未支付'; } 
+                        else { p.prepaid = Number(p.prepaid) - cost; sub.s = '已支付'; } 
+                    } else { alert("找不到該廠商資料，無法操作預付餘額"); return; }
+                } else {
+                    if(isPrepaidVendor && sub.s !== '已支付') {
+                        if(confirm(`廠商 [${sub.v}] 設定為預付廠商。是否從預付餘額扣款？`)) {
+                            sub.b = PREPAID_KEY;
+                            p.prepaid = Number(p.prepaid) - cost;
+                            sub.s = '已支付';
+                        } else {
+                             let bank = sub.b || db.b[0]?.name;
+                             updateBank(bank, -cost, `[對帳付] ${sub.v} - ${o.proj}`); sub.s = '已支付';
+                        }
+                    } else {
+                        let bank = sub.b || db.b[0]?.name;
+                        if (sub.s === '已支付') { updateBank(bank, cost, `[反悔退] ${sub.v} - ${o.proj}`); sub.s = '未支付'; } 
+                        else { updateBank(bank, -cost, `[對帳付] ${sub.v} - ${o.proj}`); sub.s = '已支付'; }
+                    }
+                }
+            } else if (type === 'e') {
+                let e = db.e.find(x => x.id == id); if (!e) return;
+                let amt = safeNum(e.amt);
+                if (e.status === '已支付') { updateBank(e.bank, amt, `[反悔退] ${e.note}`); e.status = '未支付'; } 
+                else { updateBank(e.bank, -amt, `[對帳付] ${e.note}`); e.status = '已支付'; }
+            }
+            save(); refreshStatement(); renderAll(); 
+        } catch(err) { console.error(err); alert("對帳操作失敗，請嘗試重整頁面"); }
+    }
+
+    function refreshStatement(){
+        const p = db.p.find(x => x.id == currentPid); if(!p) { alert("找不到該名單資料"); return; } 
+        const s = document.getElementById('modal_start').value, e = document.getElementById('modal_end').value;
+        const filterVal = document.getElementById('modal_filter').value;
+        document.getElementById('modal_title').innerText = (p.type=='c'?'收款對帳 - ':'付款對帳 - ') + p.name;
+        document.getElementById('modal_info').innerText = `${s} ~ ${e}`;
+        let h = '', t = 0, pd = 0;
+
+        if(p.type == 'c'){
+            db.o.filter(o => o.cust == p.name && o.date >= s && o.date <= e).forEach(o => {
+                if(filterVal === 'unpaid' && o.pay === '已收全款') return; if(filterVal === 'paid' && o.pay !== '已收全款') return;
+                let price = safeNum(o.price), paid = 0, statusClass = 'st-unpaid';
+                if(o.pay == '已收全款') { paid = price; statusClass = 'st-paid'; } else if(o.pay == '已收訂金') { paid = safeNum(o.deposit); statusClass = 'st-deposit'; }
+                t += price; pd += paid;
+                h += `<tr><td>${o.date}</td><td>${o.proj} ${o.invNum ? '<br><small>('+o.invNum+')</small>' : ''}</td><td>$${price.toLocaleString()}</td><td><select class="stmt-bank-sel" onchange="updateStmtBank(this, 'o_main', ${o.id})">${getBankOptions(o.bank)}</select> <button class="status-btn ${statusClass}" onclick="toggleStmtStatus('o_main', ${o.id})">${o.pay}</button></td></tr>`;
+            });
+        } else {
+            db.o.forEach(o => {
+                if(o.subs && Array.isArray(o.subs)){
+                    o.subs.forEach((sb, idx) => {
+                        if(sb.v == p.name && o.date >= s && o.date <= e){
+                            if(filterVal === 'unpaid' && sb.s === '已支付') return; if(filterVal === 'paid' && sb.s !== '已支付') return;
+                            let cost = safeNum(sb.c); t += cost; let statusClass = 'st-unpaid';
+                            if(sb.s == '已支付') { pd += cost; statusClass = 'st-paid'; }
+                            
+                            // V7.60: 顯示預付扣款
+                            let bankSelectHtml = '';
+                            if(p.isPrepaid) {
+                                bankSelectHtml = `<span style="color:#d97706;font-weight:bold;font-size:12px;">預付扣款</span>`;
+                            } else {
+                                bankSelectHtml = `<select class="stmt-bank-sel" onchange="updateStmtBank(this, 'o_sub', ${o.id}, ${idx})">${getBankOptions(sb.b)}</select>`;
+                            }
+
+                            h += `<tr><td>${o.date}</td><td>[包] ${o.proj}</td><td>$${cost.toLocaleString()}</td><td>${bankSelectHtml} <button class="status-btn ${statusClass}" onclick="toggleStmtStatus('o_sub', ${o.id}, ${idx})">${sb.s}</button></td></tr>`;
+                        }
+                    });
+                }
+            });
+            db.e.filter(x => x.target == p.name && x.date >= s && x.date <= e).forEach(x => {
+                if(filterVal === 'unpaid' && x.status === '已支付') return; if(filterVal === 'paid' && x.status !== '已支付') return;
+                let amt = safeNum(x.amt); t += amt; let statusClass = 'st-unpaid';
+                if(x.status == '已支付') { pd += amt; statusClass = 'st-paid'; }
+                h += `<tr><td>${x.date}</td><td>[支] ${x.note}</td><td>$${amt.toLocaleString()}</td><td><select class="stmt-bank-sel" onchange="updateStmtBank(this, 'e', ${x.id})">${getBankOptions(x.bank)}</select> <button class="status-btn ${statusClass}" onclick="toggleStmtStatus('e', ${x.id})">${x.status}</button></td></tr>`;
+            });
+        }
+        document.getElementById('modal_table').innerHTML = `<thead><tr><th>日期</th><th>項目</th><th>應${p.type=='c'?'收':'付'}</th><th>狀態 / 銀行 (點擊變更)</th></tr></thead><tbody>${h || '<tr><td colspan=4>無符合資料</td></tr>'}</tbody>`;
+        let balance = t - pd;
+        
+        let prepaidInfo = '';
+        if(p.type === 'v') {
+             let pp = Number(p.prepaid) || 0;
+             prepaidInfo = ` | <span style="color:${pp>=0?'#059669':'#ef4444'}">現有預付餘額: $${pp.toLocaleString()}</span>`;
+        }
+
+        document.getElementById('modal_summary').innerHTML = `總金額: $${t.toLocaleString()} | 已結清: $${pd.toLocaleString()} | 未結清: $${balance.toLocaleString()}${prepaidInfo}`;
+    }
+
+    function editO(id){
+        const o=db.o.find(x=>x.id==id);
+        document.getElementById('o_edit_id').value=o.id; document.getElementById('o_date').value=o.date; document.getElementById('o_proj').value=o.proj;
+        document.getElementById('o_cust').value=o.cust; document.getElementById('o_invoice').value=o.invoice; document.getElementById('o_inv_num').value=o.invNum||''; 
+        document.getElementById('o_price').value=o.price; document.getElementById('o_base').value=o.base; document.getElementById('o_tax').value=o.tax;
+        document.getElementById('o_deposit').value=o.deposit; document.getElementById('o_inv').value=o.inv; document.getElementById('o_pay').value=o.pay;
+        document.getElementById('o_bank').value=o.bank; document.getElementById('o_note').value=o.note||'';
+        document.getElementById('sub_area').innerHTML=''; o.subs.forEach(s=>addSubRow(s.v,s.c,s.s,s.b));
+        switchTab('orders'); document.getElementById('orderForm').scrollIntoView({ behavior: 'smooth' });
+    }
+    function editE(id){
+        const e=db.e.find(x=>x.id==id);
+        document.getElementById('e_edit_id').value=e.id; document.getElementById('e_date').value=e.date; document.getElementById('e_note').value=e.note;
+        document.getElementById('e_target').value=e.target; document.getElementById('e_amt').value=e.amt; document.getElementById('e_bank').value=e.bank;
+        document.getElementById('e_status').value=e.status; document.getElementById('e_remark').value=e.remark||'';
+        switchTab('expenses'); document.getElementById('expForm').scrollIntoView({ behavior: 'smooth' });
+    }
+    function editR(id){
+        const r=db.r.find(x=>x.id==id);
+        document.getElementById('r_edit_id').value=r.id; document.getElementById('r_title').value=r.title; document.getElementById('r_amt').value=r.amt;
+        document.getElementById('r_bank').value=r.bank; document.getElementById('r_period').value=r.period; document.getElementById('r_cycle_val').value=r.cycleVal;
+        document.getElementById('r_start').value=r.start; document.getElementById('r_end').value=r.end; document.getElementById('r_note').value=r.note||'';
+        document.getElementById('recurForm').scrollIntoView({ behavior: 'smooth' });
+    }
+    function editP(id){
+        const p=db.p.find(x=>x.id==id); document.getElementById('p_edit_id').value=p.id; document.getElementById('p_type').value=p.type; document.getElementById('p_name').value=p.name; document.getElementById('p_tax').value=p.tax; document.getElementById('p_address').value = p.address || ''; document.getElementById('p_note').value = p.note || '';
+        document.getElementById('p_is_prepaid').checked = p.isPrepaid || false;
+        document.getElementById('contact_area').innerHTML = ''; if (p.contacts && Array.isArray(p.contacts) && p.contacts.length > 0) { p.contacts.forEach(c => addContactRow(c.n, c.p, c.l)); } else if (p.contact || p.phone) { addContactRow(p.contact || '', p.phone || '', ''); }
+        document.getElementById('partyForm').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function del(t,id){
+        if(!confirm('刪除？'))return;
+        if(t=='e'){
+            let e=db.e.find(x=>x.id==id);
+            if(e){
+                if(e.status=='已支付'){ let b=db.b.find(x=>x.name==e.bank); if(b&&b.type!='credit') updateBank(e.bank,e.amt,'[退]'+e.note); }
+                if(e.linkId){ let r=db.r.find(x=>x.id==e.linkId); if(r && confirm('這是固定支出費用，是否將合約日期倒回上一期？')){ r.nextDate=calcPrev(r.nextDate,r.period,r.cycleVal); } }
+            }
+            db.e=db.e.filter(x=>x.id!=id);
+        } else {
+            if(t=='o'){ 
+                let o=db.o.find(x=>x.id==id); 
+                if(o && o.subs) { 
+                    o.subs.forEach(s => { 
+                        if(s.s === '已支付' && s.b === PREPAID_KEY) { 
+                            let p = db.p.find(px=>px.name===s.v && px.type==='v'); 
+                            if(p) p.prepaid = Number(p.prepaid) + s.c; 
+                        }
+                    }); 
+                }
+                db.o=db.o.filter(x=>x.id!=id); 
+            }
+            if(t=='r')db.r=db.r.filter(x=>x.id!=id); if(t=='p')db.p=db.p.filter(x=>x.id!=id); if(t=='b')db.b=db.b.filter(x=>x.id!=id);
+        }
+        save();
+    }
+
+    function hardReset(){if(confirm('清除所有資料?')) {localStorage.clear(); location.reload();}}
+    function switchTab(id){document.querySelectorAll('.tab-content,.tab-btn').forEach(e=>e.classList.remove('active'));document.querySelector(`[onclick="switchTab('${id}')"]`).classList.add('active');document.getElementById(id).classList.add('active'); if(id=='reports') renderReports();}
+    function renderAll(){updateBankSelects();renderOrders();renderExpenses();renderRecurring();renderBanks();renderParties();
+        let rev=0,cost=0,ar=0,ap=0,vi=0,vo=0,tm=new Date().toISOString().slice(0,7);
+        db.o.forEach(o=>{if(o.date.startsWith(tm)){rev+=o.base||0;vo+=o.tax||0} if(o.pay=='未收款')ar+=o.price||0;else if(o.pay=='已收訂金')ar+=(o.price-o.deposit)||0; o.subs.forEach(s=>{if(s.s=='未支付')ap+=s.c||0})});
+        db.e.forEach(e=>{if(e.date.startsWith(tm)){cost+=e.base||0;vi+=e.tax||0} if(e.status=='未支付')ap+=e.amt||0});
+        document.getElementById('kpi_cash').innerText='$'+safeNum(rev-cost).toLocaleString();
+        document.getElementById('kpi_vat').innerText='$'+safeNum(vo-vi).toLocaleString();
+        document.getElementById('kpi_ar').innerText='$'+safeNum(ar).toLocaleString();
+        document.getElementById('kpi_ap').innerText='$'+safeNum(ap).toLocaleString();
+    }
+    function exportData(){const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db));const a=document.createElement('a');a.href=d;a.download="ERP_Backup_V768.json";document.body.appendChild(a);a.click();a.remove();}
+    function importData(input){const f=input.files[0];const r=new FileReader();r.onload=function(e){try{db=JSON.parse(e.target.result);save();alert('匯入成功');location.reload();}catch{alert('Error')}};r.readAsText(f);}
+
+    document.getElementById('o_date').valueAsDate = new Date(); document.getElementById('e_date').valueAsDate = new Date();
+</script>
+</body>
+</html>
